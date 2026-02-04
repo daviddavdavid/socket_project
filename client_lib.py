@@ -30,25 +30,52 @@ class client_socket:
     def connect_to_server(self):
         current_socket = self.current_socket
         if self.connected == True:
-            raise Exception("Socket is already connected")
+            raise Exception("SOCKET ALREADY CONNECTED ERROR")
         if current_socket is not None and isinstance(self.HOST, str) and isinstance(self.PORT, int):
             current_socket.connect((self.HOST, self.PORT))
             self.connected = True
             return self.connected
-        raise Exception("Connecting is not possible, values are missing")
+        raise Exception("CONNECTION NOT POSSIBLE, HOST AND PORT NOT DEFINED")
     
     def close(self):
         try:
             self.current_socket.close()
         except OSError as error:
-            raise Exception(f"Socket closing had issues because of {error!r}")
+            raise Exception(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
         finally:
             self.current_socket = None
             print(f"Connection ended, client closed the socket")
 
-    def write_data(self):
-        print("Writing to server")
 
+    def _send_to_server(self, total_message):
+        self.current_socket.sendall(total_message)
+
+    def write_data(self, message):
+        if isinstance(message, str) == False:
+            raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
+        if message_length := len(message) > 1023:
+            raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
+        
+        encoding = "utf-8"
+        encoded_message = message.encode(encoding)
+        encoded_json_header = self._make_header(message_length)
+        encoded_json_header_length = len(encoded_json_header)
+        protoheader = encoded_json_header_length.encode(encoding)
+
+        total_message = protoheader + encoded_json_header + encoded_message
+        self._send_to_server(total_message)
+
+    def _make_header(message_length):
+        encoding = "utf-8"
+        json_dict = {
+            "message_length": message_length,
+            "message_encoding": encoding, # we just do utf-8 in our program
+            "message_type": "str" # we just do strings for now
+        }
+
+        json_header = json.dumps(json_dict)
+        encoded_json_header = json_dict.encode(encoding)
+        return encoded_json_header
 
     def get_data(self):
         # TBA server closing
@@ -61,22 +88,22 @@ class client_socket:
             self.received_data += data
         else:
             self.close()
-            raise Exception("Error: Connection has closed")
+            raise Exception("CONECTION HAS ENDED ERROR")
 
     def _json_encode(self):
         if self.json_header == None:
-            raise Exception("No header provided") 
+            raise Exception("NO PROTOHEADER FOUND") 
         encoded_json_header = json.dumps(self.json_header).encode("utf-8")
         return encoded_json_header
 
     def _json_decode(self, encoded_header):
         if encoded_header == None:
-            raise Exception("No json header that can be decoded be found")
+            raise Exception("NO JSON HEADER FOUND")
         json_header = json.loads(encoded_header.decode("utf-8"))
         return json_header
 
 
-    def read_message(self, content):
+    def read_message(self):
         self.get_data() # The program is meant to wait here till the server has sent something
 
         if self.json_header_length is None:
@@ -87,11 +114,11 @@ class client_socket:
         if self.json_header is None:
             if len(self.received_data) < self.json_header_length:
                 self._reset(keep_buffer=True)
-                raise Exception("No JSON HEADER") # TBA it is an error for now
+                raise Exception("NO JSON HEADER ERROR") # TBA it is an error for now
             self._read_header()
 
         if len(self.received_data) < self.message_length:
-            raise Exception("No MESSAGE")
+            raise Exception("NO MESSAGE ERROR")
         
         self._read_message_content()
         self._reset() # resets all the values so it is ready for the next read cycle
@@ -119,6 +146,7 @@ class client_socket:
             raise Exception("NON STRING ERROR: We only accept strings for now")
         elif self.message_encoding != "utf-8":
             raise Exception("NON UTF-8 ENCODING: we only accept utf-8")
+        
         body = self.received_data[:self.message_length]
         self.received_data = self.received_data[self.message_length:]
         self.message = body.decode(self.message_encoding)
