@@ -8,7 +8,7 @@ class client_socket:
         self.protoheader = None
         self.header = None
         self.content = None
-        self.collected_data = None
+        self.received_data = None
 
     def create_socket(self, HOST, PORT):
         if client_socket == None:
@@ -23,13 +23,25 @@ class client_socket:
             client_socket.connect((self.HOST, self.PORT))
             return True
         raise("Connecting is not possible, values are missing")
-        
-    def process_data(self):
-        pass
+    
+    def close(self):
+        self.socket.close()
+        print(f"Connection ended, client closed the socket")
 
-
+    def receive_data(self):
+        try:
+            data = self.client_socket.recv(4096)
+        except BlockingIOError:
+            pass # just try again in a second when the data is there
+        if data != None:
+            self.receive_data = data
+        else:
+            self.close()
+            raise("Error: Connection has closed")
+            
     def read_message(self, content):
-        self.collected_data = self.process_data()
+        self.receive_data() # The program is meant to wait here till the server has sent something
+
         if self.protoheader == None:
             self.protoheader = self.read_proto_header()
 
@@ -42,6 +54,12 @@ class client_socket:
             raise("You send way too much content")
         
         self.read_message_content()
+
+    def json_encode(self):
+        pass
+
+    def json_decode(self):
+        pass
 
     def read_proto_header(self):
         pass
