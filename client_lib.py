@@ -25,7 +25,6 @@ class client_socket:
             self.current_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.HOST = HOST
             self.PORT = PORT
-        return self.current_socket
     
     def connect_to_server(self):
         current_socket = self.current_socket
@@ -79,11 +78,11 @@ class client_socket:
         encoded_json_header = json_header.encode(encoding)
         return encoded_json_header
 
-    def get_data(self):
+    def _get_data(self):
         # TBA server closing
         data = b""
         try:
-            data = self.current_socket.recv(4096)
+            data = self.current_socket.recv(1024)
         except BlockingIOError:
             pass # just try again in a second when the data is there
         if data != b"":
@@ -106,7 +105,7 @@ class client_socket:
 
 
     def read_message(self):
-        self.get_data() # The program is meant to wait here till the server has sent something
+        self._get_data() # The program is meant to wait here till the server has sent something
 
         if self.json_header_length is None:
             if len(self.received_data) < 2:

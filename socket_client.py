@@ -1,21 +1,22 @@
 import asyncio
 import socket
+import client_lib
 
 
-def client_function(socket_list):
-    for i, socket in enumerate(socket_list):
-        socket.sendall(f"this is socket {str(i)} communicating to the server".encode("utf-8"))
-        socket.close()
+def client_function(client_list):
+    for i, current_client in enumerate(client_list):
+        current_client.write_data(f"hi, I am client {i}")
+        current_client.close()
     
-
-def create_client_sockets(N, HOST, PORT):
-    socket_list = []
+def create_clients(N, HOST, PORT):
+    client_list = [] 
     for i in range(N):
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))
-        socket_list.append(client_socket)
+        current_client = client_lib.client_socket()
+        current_client.create_socket(HOST, PORT)
+        current_client.connect_to_server()
+        client_list.append(current_client)
 
-    return socket_list
+    return client_list
             
 def main():
     N = 2
@@ -23,9 +24,8 @@ def main():
     HOST = "127.0.0.1"
     PORT = 2444
 
-    socket_list = create_client_sockets(N, HOST, PORT)
-    client_function(socket_list)
-
+    client_list = create_clients(N, HOST, PORT)
+    client_function(client_list)
 
 if __name__ == "__main__":
     main()
