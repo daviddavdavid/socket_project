@@ -48,24 +48,26 @@ class client_socket:
 
 
     def _send_to_server(self, total_message):
+        if self.current_socket is None:
+            raise Exception("SOCKET IS NOT CONNECTED ERROR")
         self.current_socket.sendall(total_message)
 
     def write_data(self, message):
-        if isinstance(message, str) == False:
+        if isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
-        if message_length := len(message) > 1023:
+        message_length = len(message)
+        if message_length  > 1023:
             raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
-        
         encoding = "utf-8"
         encoded_message = message.encode(encoding)
         encoded_json_header = self._make_header(message_length)
         encoded_json_header_length = len(encoded_json_header)
-        protoheader = encoded_json_header_length.encode(encoding)
+        protoheader = struct.pack(">H", encoded_json_header_length)
 
         total_message = protoheader + encoded_json_header + encoded_message
         self._send_to_server(total_message)
 
-    def _make_header(message_length):
+    def _make_header(self, message_length):
         encoding = "utf-8"
         json_dict = {
             "message_length": message_length,
@@ -74,7 +76,7 @@ class client_socket:
         }
 
         json_header = json.dumps(json_dict)
-        encoded_json_header = json_dict.encode(encoding)
+        encoded_json_header = json_header.encode(encoding)
         return encoded_json_header
 
     def get_data(self):
