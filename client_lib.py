@@ -1,72 +1,128 @@
 import socket
-
+import json
+import struct
 class client_socket:
     def __init__(self):
-        self.client_socket = None
+        self.current_socket = None
         self.HOST = None
         self.PORT = None
-        self.protoheader = None
-        self.header = None
+        self.connected = False
+        self._reset()
+
+    def _reset(self):
+        self.received_data = b""
         self.content = None
-        self.received_data = None
+        self.encoded_header = None
+        self.json_header_length = None
+        self.json_header
+        self.message_length = None
+        self.message_encoding = None
+        self.message_type = None
+        self.message = None
 
     def create_socket(self, HOST, PORT):
-        if client_socket == None:
-            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.current_socket is None:
+            self.current_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.HOST = HOST
             self.PORT = PORT
-        return socket
+        return self.current_socket
     
     def connect_to_server(self):
-        client_socket = self.client_socket
-        if client_socket != None & isinstance(self.HOST, str) & isinstance(self.PORT, int):
-            client_socket.connect((self.HOST, self.PORT))
-            return True
-        raise("Connecting is not possible, values are missing")
+        current_socket = self.current_socket
+        if self.connected == True:
+            raise Exception("Socket is already connected")
+        if current_socket is not None and isinstance(self.HOST, str) and isinstance(self.PORT, int):
+            current_socket.connect((self.HOST, self.PORT))
+            self.connected = True
+            return self.connected
+        raise Exception("Connecting is not possible, values are missing")
     
     def close(self):
-        self.socket.close()
-        print(f"Connection ended, client closed the socket")
-
-    def receive_data(self):
         try:
-            data = self.client_socket.recv(4096)
+            self.current_socket.close()
+        except OSError as error:
+            raise Exception(f"Socket closing had issues because of {error!r}")
+        finally:
+            self.current_socket = None
+            print(f"Connection ended, client closed the socket")
+
+    def write_data(self):
+        print("Writing to server")
+
+
+    def get_data(self):
+        # TBA server closing
+        data = b""
+        try:
+            data = self.current_socket.recv(4096)
         except BlockingIOError:
             pass # just try again in a second when the data is there
-        if data != None:
-            self.receive_data = data
+        if data != b"":
+            self.received_data += data
         else:
             self.close()
-            raise("Error: Connection has closed")
-            
+            raise Exception("Error: Connection has closed")
+
+    def _json_encode(self):
+        if self.json_header == None:
+            raise Exception("No header provided") 
+        encoded_json_header = json.dumps(self.json_header).encode("utf-8")
+        return encoded_json_header
+
+    def _json_decode(self, encoded_header):
+        if encoded_header == None:
+            raise Exception("No json header that can be decoded be found")
+        json_header = json.loads(encoded_header.decode("utf-8"))
+        return json_header
+
+
     def read_message(self, content):
-        self.receive_data() # The program is meant to wait here till the server has sent something
+        self.get_data() # The program is meant to wait here till the server has sent something
 
-        if self.protoheader == None:
-            self.protoheader = self.read_proto_header()
+        if self.json_header_length is None:
+            if len(self.received_data) < 2:
+                return None # we wamt it to wait for more
+            self._read_proto_header()
 
-        if self.header == None:
-            self.header = self.read_header()
+        if self.json_header is None:
+            if len(self.received_data) < self.json_header_length:
+                self._reset(keep_buffer=True)
+                raise Exception("No JSON HEADER") # TBA it is an error for now
+            self._read_header()
 
-        if isinstance(content, str) == False:
-            raise("You did not supply any content string")
-        elif len(content) > 1023:
-            raise("You send way too much content")
+        if len(self.received_data) < self.message_length:
+            raise Exception("No MESSAGE")
         
-        self.read_message_content()
+        self._read_message_content()
+        self._reset() # resets all the values so it is ready for the next read cycle
+        return self.message
 
-    def json_encode(self):
-        pass
+    def _read_proto_header(self):
+        header_length = 2
+        if len(self.received_data) >= 2:
+            self.json_header_length = struct.unpack(">H", self.received_data[:header_length])[0]
+        self.received_data = self.received_data[header_length:]
 
-    def json_decode(self):
-        pass
+    def _read_header(self):
+        encoded_json_header = self.received_data[:self.json_header_length]
+        self.received_data = self.received_data[self.json_header_length:]
+        json_header = self._json_decode(encoded_json_header)
+        self.message_length = json_header["message_length"]
+        self.message_encoding = json_header["message_encoding"]
+        self.message_type = json_header["message_type"]
 
-    def read_proto_header(self):
-        pass
+        
+    def _read_message_content(self):
+        if (self.message_length > 1023):
+            raise Exception("TOO MUCH DATA ERROR: TBA, now we dont accept large message lengths")
+        elif self.message_type != "str":
+            raise Exception("NON STRING ERROR: We only accept strings for now")
+        elif self.message_encoding != "utf-8":
+            raise Exception("NON UTF-8 ENCODING: we only accept utf-8")
+        body = self.received_data[:self.message_length]
+        self.received_data = self.received_data[self.message_length:]
+        self.message = body.decode(self.message_encoding)
+        
 
-    def read_header(self):
-        pass
-
-    def read_message_content(self):
-        pass
+        
 
