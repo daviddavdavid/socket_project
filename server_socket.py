@@ -1,28 +1,29 @@
 import asyncio
 import socket
 import server_lib
-async def handle_client(server):
+async def handle_client(server, client_connection):
     try:
         while True:
-            message = await server.read_message()
+            message = await client_connection.read_message()
             if not message:
                 break
             print(f"{message}")
     except KeyboardInterrupt:
-        raise("Server has ended")
+        raise Exception("SERVER HAS ENDED")
     finally:
         server.close()
 
 
 async def server_function(HOST, PORT):
-    loop = asyncio.get_event_loop()
-    server = server_lib.server()
+    loop = asyncio.get_running_loop()
+    server = server_lib.Server()
     server.create_socket()
     
     while True:
-        await server.accept_client()
-        if server.connection != None:
-            await handle_client(server.connection, loop)
+        client_connection = await server.accept_client()
+        if client_connection != None:
+            await handle_client(server, client_connection)
+    
             
 def main():
     # random values

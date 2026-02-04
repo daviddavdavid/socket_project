@@ -1,7 +1,7 @@
 import socket
 import json
 import struct
-class client_socket:
+class ClientSocket:
     def __init__(self):
         self.current_socket = None
         self.HOST = None
@@ -14,7 +14,7 @@ class client_socket:
         self.content = None
         self.encoded_header = None
         self.json_header_length = None
-        self.json_header
+        self.json_header = None
         self.message_length = None
         self.message_encoding = None
         self.message_type = None
@@ -52,7 +52,7 @@ class client_socket:
         self.current_socket.sendall(total_message)
 
     def write_data(self, message):
-        if isinstance(message, str):
+        if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
         message_length = len(message)
         if message_length  > 1023:

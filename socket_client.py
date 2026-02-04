@@ -11,7 +11,7 @@ def client_function(client_list):
 def create_clients(N, HOST, PORT):
     client_list = [] 
     for i in range(N):
-        current_client = client_lib.client_socket()
+        current_client = client_lib.ClientSocket()
         current_client.create_socket(HOST, PORT)
         current_client.connect_to_server()
         client_list.append(current_client)

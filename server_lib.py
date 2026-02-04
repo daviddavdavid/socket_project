@@ -3,13 +3,42 @@ import json
 import struct
 import asyncio
 
-class server:
-    def __init__(self):
+class Server:
+    def __init__(self, HOST, PORT):
         self.current_socket = None
         self.HOST = None
         self.PORT = None
-        self.address = None
-        self.connection = None
+
+    def create_socket(self, HOST, PORT):
+        if self.current_socket is not None:
+            return 
+        
+        current_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        current_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if not isinstance(self.HOST, str) or not isinstance(self.PORT, int):
+            raise Exception("Host and/or PORT is wrong")
+
+        current_socket.bind((HOST, PORT))
+        current_socket.listen()
+        current_socket.setblocking(False)
+        self.current_socket = current_socket
+    
+    async def accept_client(self):
+        loop = asyncio.get_running_loop()
+        current_socket = self.current_socket
+        if current_socket is None or not isinstance(self.HOST, str) or not isinstance(self.PORT, int):
+            raise Exception("CONNECTION NOT POSSIBLE, HOST AND PORT NOT DEFINED")
+        
+        connection, address = await loop.sock_accept(current_socket)
+        connection.setblocking(False)
+        return ClientConnection(connection, address)
+
+
+
+class ClientConnection:
+    def __init__(self, client_socket, address):
+        self.current_socket = client_socket
+        self.address = address
         self._reset()
 
     def _reset(self):
@@ -17,36 +46,12 @@ class server:
         self.content = None
         self.encoded_header = None
         self.json_header_length = None
-        self.json_header
+        self.json_header = None
         self.message_length = None
         self.message_encoding = None
         self.message_type = None
         self.message = None
-
-    def create_socket(self, HOST, PORT):
-        if self.current_socket is None:
-            current_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            current_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            current_socket.bind((HOST, PORT))
-            current_socket.listen()
-            current_socket.setblocking(False)
-
-            self.current_socket = current_socket
-            self.HOST = HOST
-            self.PORT = PORT # we keep it to be sure
-        return self.current_socket
     
-    async def accept_client(self):
-        loop = asyncio.get_event_loop()
-        current_socket = self.current_socket
-        if current_socket is None or not isinstance(self.HOST, str) or not isinstance(self.PORT, int):
-            raise Exception("CONNECTION NOT POSSIBLE, HOST AND PORT NOT DEFINED")
-        
-        connection, address = await loop.sock_accept(current_socket)
-        self.connection = connection
-        self.address = address
-        connection.setblocking(False)
-
     def close(self):
         try:
             self.current_socket.close()
@@ -58,13 +63,13 @@ class server:
 
 
     async def _send_to_client(self, total_message):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         if self.current_socket is None:
             raise Exception("SOCKET IS NOT CONNECTED ERROR")
-        loop.sock_sendall(self.current_socket, total_message)
+        await loop.sock_sendall(self.current_socket, total_message)
 
-    def write_data(self, message):
-        if isinstance(message, str):
+    async def write_data(self, message):
+        if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
         message_length = len(message)
         if message_length  > 1023:
@@ -76,7 +81,7 @@ class server:
         protoheader = struct.pack(">H", encoded_json_header_length)
 
         total_message = protoheader + encoded_json_header + encoded_message
-        self._send_to_client(total_message)
+        await self._send_to_client(total_message)
 
     def _make_header(self, message_length):
         encoding = "utf-8"
@@ -90,14 +95,12 @@ class server:
         encoded_json_header = json_header.encode(encoding)
         return encoded_json_header
 
-    async def get_data(self):
-        loop = asyncio.get_event_loop()
+    async def _get_data(self):
+        loop = asyncio.get_running_loop()
         # TBA server closing
         data = b""
-        try:
-            data = loop.sock_recv(self.current_socket, 1024)
-        except BlockingIOError:
-            pass # just try again in a second when the data is there
+        data = await loop.sock_recv(self.current_socket, 1024)
+
         if data != b"":
             self.received_data += data
         else:
@@ -118,7 +121,7 @@ class server:
 
 
     async def read_message(self):
-        self.get_data() # The program is meant to wait here till the server has sent something
+        await self._get_data() # The program is meant to wait here till the server has sent something
 
         if self.json_header_length is None:
             if len(self.received_data) < 2:
