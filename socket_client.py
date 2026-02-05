@@ -6,7 +6,6 @@ import client_lib
 def client_function(client_list):
     for i, current_client in enumerate(client_list):
         current_client.write_data(f"hi, I am client {i}")
-        current_client.close()
     
 def create_clients(N, HOST, PORT):
     client_list = [] 
@@ -19,7 +18,7 @@ def create_clients(N, HOST, PORT):
     return client_list
             
 def main():
-    N = 100
+    N = 1
     # random values
     HOST = "127.0.0.1"
     PORT = 2444

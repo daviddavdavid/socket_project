@@ -8,6 +8,7 @@ async def handle_client(server, client_connection):
             if not message:
                 break
             print(f"{message}")
+            await client_connection.write_data("Hello client")
     except KeyboardInterrupt:
         pass
     finally:

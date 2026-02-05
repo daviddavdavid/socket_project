@@ -81,6 +81,7 @@ class ClientConnection:
     async def write_data(self, message):
         if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
+        encoding = "utf-8"
         encoded_message = message.encode(encoding)
         message_length = len(encoded_message)
 
@@ -135,7 +136,6 @@ class ClientConnection:
                 print("Invalid Header Data")
                 self._reset()
                 return
-
 
     def _read_header(self):
         start = 2 # we add both since the buffer also has a protoheader before it
