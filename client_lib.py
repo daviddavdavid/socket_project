@@ -89,7 +89,7 @@ class ClientSocket:
             self.received_data += data
         else:
             self.close()
-            raise Exception("CONECTION HAS ENDED ERROR")
+            print(f"Connection has ended")
 
     def _json_encode(self):
         if self.json_header == None:

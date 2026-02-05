@@ -4,7 +4,7 @@ import struct
 import asyncio
 
 class Server:
-    def __init__(self, HOST, PORT):
+    def __init__(self):
         self.current_socket = None
         self.HOST = None
         self.PORT = None
@@ -15,9 +15,10 @@ class Server:
         
         current_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         current_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if not isinstance(self.HOST, str) or not isinstance(self.PORT, int):
+        if not isinstance(HOST, str) or not isinstance(PORT, int):
             raise Exception("Host and/or PORT is wrong")
-
+        self.PORT = PORT
+        self.HOST = HOST
         current_socket.bind((HOST, PORT))
         current_socket.listen()
         current_socket.setblocking(False)
@@ -32,6 +33,15 @@ class Server:
         connection, address = await loop.sock_accept(current_socket)
         connection.setblocking(False)
         return ClientConnection(connection, address)
+    
+    def close(self):
+        try:
+            self.current_socket.close()
+        except OSError as error:
+            raise Exception(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
+        finally:
+            self.current_socket = None
+            print(f"Connection ended, client closed the socket")
 
 
 
@@ -136,10 +146,10 @@ class ClientConnection:
 
         if len(self.received_data) < self.message_length:
             raise Exception("NO MESSAGE ERROR")
-        
         self._read_message_content()
+        message = self.message # make it so the values does not go to None because of the reset
         self._reset() # resets all the values so it is ready for the next read cycle
-        return self.message
+        return message
 
     def _read_proto_header(self):
         header_length = 2

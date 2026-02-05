@@ -11,13 +11,15 @@ async def handle_client(server, client_connection):
     except KeyboardInterrupt:
         raise Exception("SERVER HAS ENDED")
     finally:
+        client_connection.close()
         server.close()
+        
 
 
 async def server_function(HOST, PORT):
     loop = asyncio.get_running_loop()
     server = server_lib.Server()
-    server.create_socket()
+    server.create_socket(HOST, PORT)
     
     while True:
         client_connection = await server.accept_client()
