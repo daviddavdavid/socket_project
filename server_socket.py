@@ -9,10 +9,9 @@ async def handle_client(server, client_connection):
                 break
             print(f"{message}")
     except KeyboardInterrupt:
-        raise Exception("SERVER HAS ENDED")
+        pass
     finally:
         client_connection.close()
-        server.close()
         
 
 
@@ -24,7 +23,7 @@ async def server_function(HOST, PORT):
     while True:
         client_connection = await server.accept_client()
         if client_connection != None:
-            await handle_client(server, client_connection)
+            asyncio.create_task(handle_client(server, client_connection))
     
             
 def main():

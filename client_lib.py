@@ -54,11 +54,12 @@ class ClientSocket:
     def write_data(self, message):
         if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
-        message_length = len(message)
+        
         if message_length  > 1023:
             raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
         encoding = "utf-8"
         encoded_message = message.encode(encoding)
+        message_length = len(encoded_message)
         encoded_json_header = self._make_header(message_length)
         encoded_json_header_length = len(encoded_json_header)
         protoheader = struct.pack(">H", encoded_json_header_length)

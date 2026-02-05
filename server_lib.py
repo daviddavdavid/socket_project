@@ -63,15 +63,15 @@ class ClientConnection:
         self.message = None
     
     def close(self):
-        try:
-            self.current_socket.close()
-        except OSError as error:
-            raise Exception(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
-        finally:
+        sock = self.current_socket
+        if self.current_socket:
             self.current_socket = None
-            print(f"Connection ended, client closed the socket")
-
-
+            try:
+                sock.close()
+                print("Closed socket")
+            except OSError as error:
+                print(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
+        
     async def _send_to_client(self, total_message):
         loop = asyncio.get_running_loop()
         if self.current_socket is None:
@@ -81,11 +81,13 @@ class ClientConnection:
     async def write_data(self, message):
         if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
-        message_length = len(message)
+        encoded_message = message.encode(encoding)
+        message_length = len(encoded_message)
+
         if message_length  > 1023:
             raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
         encoding = "utf-8"
-        encoded_message = message.encode(encoding)
+       
         encoded_json_header = self._make_header(message_length)
         encoded_json_header_length = len(encoded_json_header)
         protoheader = struct.pack(">H", encoded_json_header_length)
@@ -115,60 +117,42 @@ class ClientConnection:
             self.received_data += data
         else:
             self.close()
-            raise Exception("CONECTION HAS ENDED ERROR")
-
-    def _json_encode(self):
-        if self.json_header == None:
-            raise Exception("NO PROTOHEADER FOUND") 
-        encoded_json_header = json.dumps(self.json_header).encode("utf-8")
-        return encoded_json_header
+            print(f"Client {self.address} has closed connection")
 
     def _json_decode(self, encoded_header):
-        if encoded_header == None:
+        if encoded_header is None or len(encoded_header) == 0:
             raise Exception("NO JSON HEADER FOUND")
         json_header = json.loads(encoded_header.decode("utf-8"))
         return json_header
 
-
-    async def read_message(self):
-        await self._get_data() # The program is meant to wait here till the server has sent something
-
-        if self.json_header_length is None:
-            if len(self.received_data) < 2:
-                return None # we wamt it to wait for more
-            self._read_proto_header()
-
-        if self.json_header is None:
-            if len(self.received_data) < self.json_header_length:
-                self._reset(keep_buffer=True)
-                raise Exception("NO JSON HEADER ERROR") # TBA it is an error for now
-            self._read_header()
-
-        if len(self.received_data) < self.message_length:
-            raise Exception("NO MESSAGE ERROR")
-        self._read_message_content()
-        message = self.message # make it so the values does not go to None because of the reset
-        self._reset() # resets all the values so it is ready for the next read cycle
-        return message
-
     def _read_proto_header(self):
         header_length = 2
         if len(self.received_data) >= 2:
-            self.json_header_length = struct.unpack(">H", self.received_data[:header_length])[0]
+            try:
+                self.json_header_length = struct.unpack(">H", self.received_data[:header_length])[0]
+            except:
+                print("Invalid Header Data")
+                self._reset()
+                return
         self.received_data = self.received_data[header_length:]
+
 
     def _read_header(self):
         encoded_json_header = self.received_data[:self.json_header_length]
         self.received_data = self.received_data[self.json_header_length:]
         json_header = self._json_decode(encoded_json_header)
+
+        for key in ["message_length", "message_encoding", "message_type"]:
+            if key not in json_header:
+                raise Exception("Invalid data in JSON header")
+
         self.message_length = json_header["message_length"]
         self.message_encoding = json_header["message_encoding"]
         self.message_type = json_header["message_type"]
 
-        
     def _read_message_content(self):
-        if (self.message_length > 1023):
-            raise Exception("TOO MUCH DATA ERROR: TBA, now we dont accept large message lengths")
+        if (self.message_length > 1023 and self.message_length > 0):
+            raise Exception("TOO MUCH DATA ERROR: TBA, now we dont accept large or invalid message lengths")
         elif self.message_type != "str":
             raise Exception("NON STRING ERROR: We only accept strings for now")
         elif self.message_encoding != "utf-8":
@@ -178,5 +162,33 @@ class ClientConnection:
         self.received_data = self.received_data[self.message_length:]
         self.message = body.decode(self.message_encoding)
         
+
+    async def read_message(self):
+        await self._get_data() # The program is meant to wait here till the server has sent something
+
+        # TBA, finding a better loop to encapsulate messages that have not arrived properly. Now we just discard that
+        if self.json_header_length is None:
+            if len(self.received_data) < 2:
+                return None # we wamt it to wait for more
+            self._read_proto_header()
+
+        if self.json_header_length:
+            if len(self.received_data) < self.json_header_length:
+                self._reset()
+                print(f"No JSON header, exiting buffer") 
+                return None
+            self._read_header()
+
+        if len(self.received_data) < self.message_length:
+            self._reset()
+            print(f"No message found yet, exiting")
+            return None
+        
+        self._read_message_content()
+        message = self.message # make it so the values does not go to None because of the reset
+        self._reset() # resets all the values so it is ready for the next read cycle
+        return message
+    
+   
 
         
