@@ -130,16 +130,18 @@ class ClientConnection:
         if len(self.received_data) >= 2:
             try:
                 self.json_header_length = struct.unpack(">H", self.received_data[:header_length])[0]
+                if self.json_header_length <= 0 or self.json_header_length > 1023:
+                    raise Exception("Json header length is false")
             except:
                 print("Invalid Header Data")
                 self._reset()
                 return
-        self.received_data = self.received_data[header_length:]
 
 
     def _read_header(self):
-        encoded_json_header = self.received_data[:self.json_header_length]
-        self.received_data = self.received_data[self.json_header_length:]
+        start = 2 # we add both since the buffer also has a protoheader before it
+        end = 2 + self.json_header_length 
+        encoded_json_header = self.received_data[start:end]
         json_header = self._json_decode(encoded_json_header)
 
         for key in ["message_length", "message_encoding", "message_type"]:
@@ -151,15 +153,18 @@ class ClientConnection:
         self.message_type = json_header["message_type"]
 
     def _read_message_content(self):
-        if (self.message_length > 1023 and self.message_length > 0):
+        if (self.message_length > 1023 or self.message_length <= 0):
             raise Exception("TOO MUCH DATA ERROR: TBA, now we dont accept large or invalid message lengths")
         elif self.message_type != "str":
             raise Exception("NON STRING ERROR: We only accept strings for now")
         elif self.message_encoding != "utf-8":
             raise Exception("NON UTF-8 ENCODING: we only accept utf-8")
         
-        body = self.received_data[:self.message_length]
-        self.received_data = self.received_data[self.message_length:]
+        # we sum the total lengths of the protoheader the json_header and the message length together
+        start = 2 + self.json_header_length
+        end = start + self.message_length
+        body = self.received_data[start:end]
+        self.received_data = self.received_data[end:] # Only now we flush the buffer
         self.message = body.decode(self.message_encoding)
         
 
@@ -169,18 +174,18 @@ class ClientConnection:
         # TBA, finding a better loop to encapsulate messages that have not arrived properly. Now we just discard that
         if self.json_header_length is None:
             if len(self.received_data) < 2:
-                return None # we wamt it to wait for more
+                print("No protoheader")
+                return None # we want it to wait for more
             self._read_proto_header()
 
-        if self.json_header_length:
-            if len(self.received_data) < self.json_header_length:
-                self._reset()
-                print(f"No JSON header, exiting buffer") 
+        proto_header_length = 2
+        if self.json_header_length is not None:
+            if len(self.received_data - proto_header_length) < self.json_header_length:
+                print(f"No JSON header") 
                 return None
             self._read_header()
 
-        if len(self.received_data) < self.message_length:
-            self._reset()
+        if len(self.received_data - self.json_header_length - proto_header_length) < self.message_length:
             print(f"No message found yet, exiting")
             return None
         
