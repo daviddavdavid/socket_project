@@ -19,7 +19,7 @@ def create_clients(N, HOST, PORT):
     return client_list
             
 def main():
-    N = 2
+    N = 100
     # random values
     HOST = "127.0.0.1"
     PORT = 2444

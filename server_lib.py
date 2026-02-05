@@ -115,10 +115,9 @@ class ClientConnection:
 
         if data != b"":
             self.received_data += data
-        else:
-            self.close()
-            print(f"Client {self.address} has closed connection")
-
+            return "Succesful"
+        return "Failure" # means that the client has closed the connection
+    
     def _json_decode(self, encoded_header):
         if encoded_header is None or len(encoded_header) == 0:
             raise Exception("NO JSON HEADER FOUND")
@@ -169,7 +168,9 @@ class ClientConnection:
         
 
     async def read_message(self):
-        await self._get_data() # The program is meant to wait here till the server has sent something
+        status = await self._get_data() # The program is meant to wait here till the server has sent something
+        if status == "Failure":
+            return None # Let the actual server_socket handle closing
 
         # TBA, finding a better loop to encapsulate messages that have not arrived properly. Now we just discard that
         if self.json_header_length is None:
@@ -180,12 +181,12 @@ class ClientConnection:
 
         proto_header_length = 2
         if self.json_header_length is not None:
-            if len(self.received_data - proto_header_length) < self.json_header_length:
+            if len(self.received_data) - proto_header_length < self.json_header_length:
                 print(f"No JSON header") 
                 return None
             self._read_header()
 
-        if len(self.received_data - self.json_header_length - proto_header_length) < self.message_length:
+        if len(self.received_data) - self.json_header_length - proto_header_length < self.message_length:
             print(f"No message found yet, exiting")
             return None
         
