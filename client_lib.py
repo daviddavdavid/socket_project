@@ -92,12 +92,12 @@ class ClientSocket:
         json_header = json.loads(encoded_header.decode("utf-8"))
         return json_header
 
-    async def _get_data(self):
+    def _get_data(self):
         # TBA server closing
         data = b""
         data = self.current_socket.recv(1024)
-
-        if data != b"":
+        print(data)
+        if data != b"" and data is not None:
             self.received_data += data
             return "Succesful"
         return "Failure" # means that the client has closed the connection
@@ -145,6 +145,7 @@ class ClientSocket:
         
     def read_message(self):
         status = self._get_data() # The program is meant to wait here till the server has sent something
+        print(status)
         if status == "Failure":
             return None # Let the actual server_socket handle closing
 

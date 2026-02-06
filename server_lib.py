@@ -114,7 +114,7 @@ class ClientConnection:
         data = b""
         data = await loop.sock_recv(self.current_socket, 1024)
 
-        if data != b"":
+        if data != b"" and data is not None:
             self.received_data += data
             return "Succesful"
         return "Failure" # means that the client has closed the connection

@@ -7,6 +7,17 @@ def client_function(client_list):
     for i, current_client in enumerate(client_list):
         current_client.write_data(f"hi, I am client {i}")
     
+    try:
+        while True:
+            message = current_client.read_message()
+            if message is not None:
+                print(message)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        current_client.close()
+
+    
 def create_clients(N, HOST, PORT):
     client_list = [] 
     for i in range(N):
