@@ -1,6 +1,9 @@
 import asyncio
 import socket
 import server_lib
+import click
+
+
 async def handle_client(server, client_connection):
     try:
         while True:
@@ -18,16 +21,15 @@ async def handle_client(server, client_connection):
 
 async def server_function(HOST, PORT):
     loop = asyncio.get_running_loop()
-    server = server_lib.Server()
+    global server = server_lib.Server()
     server.create_socket(HOST, PORT)
     
     while True:
         client_connection = await server.accept_client()
         if client_connection != None:
             asyncio.create_task(handle_client(server, client_connection))
-    
-            
-def main():
+
+def main(ctx):
     # random values
     HOST = "127.0.0.1"
     PORT = 2444
