@@ -8,6 +8,7 @@ class Server:
         self.current_socket = None
         self.HOST = None
         self.PORT = None
+        self.client_list = []
 
     def create_socket(self, HOST, PORT):
         if self.current_socket is not None:
@@ -32,16 +33,19 @@ class Server:
         
         connection, address = await loop.sock_accept(current_socket)
         connection.setblocking(False)
-        return ClientConnection(connection, address)
+        current_client_connection = ClientConnection(connection, address)
+        self.client_list.append(current_client_connection) # TODO: IMPORTANT make it so that if a client disconnects it actually remove it from the client list, for now its fine
+        return current_client_connection
     
     def close(self):
         try:
             self.current_socket.close()
+            self.client_list = None # just to be sure with garbage collecting
         except OSError as error:
             raise Exception(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
         finally:
             self.current_socket = None
-            print(f"Connection ended, client closed the socket")
+            print(f"Server has ended")
 
 
 
