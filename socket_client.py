@@ -1,6 +1,7 @@
 import asyncio
 import socket
 import client_lib
+import click
 
 
 def client_function(client_list):
@@ -27,15 +28,22 @@ def create_clients(N, HOST, PORT):
         client_list.append(current_client)
 
     return client_list
-            
-def main():
-    N = 1
-    # random values
-    HOST = "127.0.0.1"
-    PORT = 2444
 
-    client_list = create_clients(N, HOST, PORT)
+@click.group()
+def main_group():
+    pass
+
+@click.command(name="START")
+@click.option("--host", default="127.0.0.1", help="IP adress of the server")
+@click.option("--port", default="2444", help="port integer of the server, default is just a random value", type=int)
+def start_client(host, port):
+    N = 1 # I dont want this as a click value for now since this is just a temporarily option
+    # random values
+
+    client_list = create_clients(N, HOST=host, PORT=port)
     client_function(client_list)
 
+main_group.add_command(start_client)
+
 if __name__ == "__main__":
-    main()
+    main_group()

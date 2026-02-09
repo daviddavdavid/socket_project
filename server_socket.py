@@ -21,7 +21,7 @@ async def handle_client(server, client_connection):
 
 async def server_function(HOST, PORT):
     loop = asyncio.get_running_loop()
-    global server = server_lib.Server()
+    server = server_lib.Server()
     server.create_socket(HOST, PORT)
     
     while True:
@@ -29,11 +29,17 @@ async def server_function(HOST, PORT):
         if client_connection != None:
             asyncio.create_task(handle_client(server, client_connection))
 
-def main(ctx):
-    # random values
-    HOST = "127.0.0.1"
-    PORT = 2444
-    asyncio.run(server_function("127.0.0.1", 2444))
+@click.group()
+def main_group():
+    pass
+
+@click.command(name="START")
+@click.option("--host", default="127.0.0.1", help="IP adress of the server")
+@click.option("--port", default="2444", help="port integer of the server, default is just a random value", type=int)
+def start_server(host, port):
+    asyncio.run(server_function(HOST=host, PORT=port))
+
+main_group.add_command(start_server)
 
 if __name__ == "__main__":
-    main()
+    main_group()
