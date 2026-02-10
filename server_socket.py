@@ -51,6 +51,9 @@ async def command_handling(server):
 
             elif server_input.startswith("QUIT"):
                 print("Iniating server closing procedure...") # should notify clients first and then let them close so I dont get any weird errors
+                if server.client_list != []:
+                    for client_socket in server.client_list:
+                        await client_socket.write_data("SERVER_SHUTDOWN")
                 break
 
             else:

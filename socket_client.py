@@ -10,7 +10,11 @@ async def client_messsage_reader(client, shutdown_event):
      while not shutdown_event.is_set():
         try:
             message = await asyncio.wait_for(client.read_message(), timeout=0.5)
-            if message == b"" or message is None:
+            if message == "SERVER_SHUTDOWN":
+                print("Server has shut down, iniating closing procedure...")
+                shutdown_event.set()
+                break
+            elif message == b"" or message is None:
                 shutdown_event.set()
                 break
             else:
