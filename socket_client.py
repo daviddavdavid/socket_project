@@ -2,46 +2,60 @@ import asyncio
 import socket
 import client_lib
 import click
+from prompt_toolkit import PromptSession
+from prompt_toolkit.patch_stdout import patch_stdout 
 
 
-def client_function(client_list):
-    for i, current_client in enumerate(client_list):
-        current_client.write_data(f"hi, I am client {i}")
-    
+async def client_messsage_reader(client):
     try:
         while True:
-            message = current_client.read_message()
+            message = await client.read_message()
             if message is not None:
                 print(message)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        current_client.close()
+    except asyncio.CancelledError: # the QUIT command has been initiated
+        pass 
 
-    
-def create_clients(N, HOST, PORT):
-    client_list = [] 
-    for i in range(N):
-        current_client = client_lib.ClientSocket()
-        current_client.create_socket(HOST, PORT)
-        current_client.connect_to_server()
-        client_list.append(current_client)
+async def client_command_control(client):
+    session = PromptSession()
+    while True:
+        with patch_stdout(): # to prevent stdout situations
+            client_input = await session.prompt_async("Command: ")
 
-    return client_list
+            if client_input.startswith("MSG ") and len(client_input) > 4:
+                await client.write_data(message=client_input[4:])
+            elif client_input.startswith("QUIT"):
+                break
+            else:
+                print(f"Unknown command: {client_input}")
 
 @click.group()
 def main_group():
     pass
 
+async def client_function(host, port):
+    # random values
+    
+    client = client_lib.ClientSocket()
+    client.create_socket(HOST=host, PORT=port)
+    client.connect_to_server()
+
+    reader_task = asyncio.create_task(client_messsage_reader(client=client))
+    writer_task = asyncio.create_task(client_command_control(client=client))
+
+    await writer_task
+
+    if not reader_task.done():
+        reader_task.cancel()
+
+    await reader_task # just to let asyncio do the right garbage collecitng
+
+    client.close()
+
 @click.command(name="START")
 @click.option("--host", default="127.0.0.1", help="IP adress of the server")
 @click.option("--port", default="2444", help="port integer of the server, default is just a random value", type=int)
 def start_client(host, port):
-    N = 1 # I dont want this as a click value for now since this is just a temporarily option
-    # random values
-
-    client_list = create_clients(N, HOST=host, PORT=port)
-    client_function(client_list)
+   asyncio.run(client_function(host=host, port=port))
 
 main_group.add_command(start_client)
 

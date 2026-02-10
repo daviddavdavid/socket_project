@@ -3,7 +3,7 @@ import socket
 import server_lib
 import click
 from prompt_toolkit import PromptSession
-from prompt_toolkit.patch_stdout import patch_stdout # package said to include this to prevent stdout errors
+from prompt_toolkit.patch_stdout import patch_stdout 
 
 async def handle_client(client_connection):
     try:
@@ -11,7 +11,7 @@ async def handle_client(client_connection):
             message = await client_connection.read_message()
             if not message:
                 break
-    except KeyboardInterrupt:
+    except asyncio.CancelledError: # the QUIT command has been initiated
         pass
     finally:
         client_connection.close()
@@ -26,12 +26,12 @@ async def server_function(HOST, PORT):
     server = server_lib.Server()
     server.create_socket(HOST=HOST, PORT=PORT)
 
-    asyncio.create_task(accept_clients(server=server))
+    reader_task = asyncio.create_task(accept_clients(server=server))
 
     print("Server has started succesfully!")
     session = PromptSession()
     while True:
-        with patch_stdout():
+        with patch_stdout(): # to prevent stdout situations
             server_input = await session.prompt_async("Command: ")
 
             if server_input.startswith("MSG ") and len(server_input) > 4:
@@ -43,6 +43,7 @@ async def server_function(HOST, PORT):
                     await client_1.write_data(message=server_input[4:]) # sends the message without the command
 
             elif server_input.startswith("QUIT"):
+                reader_task.cancel()
                 server.close()
                 break
 
