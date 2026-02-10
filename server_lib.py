@@ -85,12 +85,14 @@ class ClientConnection:
     async def write_data(self, message):
         if not isinstance(message, str):
             raise Exception("WRONG TYPE ERROR, WE ONLY ACCEPT STRINGS")
+        
         encoding = "utf-8"
         encoded_message = message.encode(encoding)
         message_length = len(encoded_message)
-
         if message_length  > 1023:
-            raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
+            print("SENDING ERROR: message is too large try again")
+            return
+
         encoding = "utf-8"
        
         encoded_json_header = self._make_header(message_length)

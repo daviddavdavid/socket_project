@@ -63,8 +63,8 @@ class ClientSocket:
         message_length = len(encoded_message)
 
         if message_length > 1023:
-            raise Exception("MESSAGE IS TOO LARGE ERROR") # Larger messages TBA
-        
+            print("MESSAGE IS TOO LARGE ERROR")
+            return
         encoded_json_header = self._make_header(message_length)
         encoded_json_header_length = len(encoded_json_header)
         protoheader = struct.pack(">H", encoded_json_header_length)
