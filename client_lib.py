@@ -102,7 +102,6 @@ class ClientSocket:
         data = b""
         
         data = await loop.sock_recv(self.current_socket, 1024)
-        print(data)
         if data != b"" and data is not None:
             self.received_data += data
             return "Succesful"
@@ -151,7 +150,6 @@ class ClientSocket:
         
     async def read_message(self):
         status = await self._get_data() # The program is meant to wait here till the server has sent something
-        print(status)
         if status == "Failure":
             return None # Let the actual server_socket handle closing
 

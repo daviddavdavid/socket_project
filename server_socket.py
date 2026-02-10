@@ -5,30 +5,36 @@ import click
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout 
 
-async def handle_client(client_connection):
-    try:
-        while True:
-            message = await client_connection.read_message()
+async def handle_client(client_connection, shutdown_event):
+    while not shutdown_event.is_set():
+        try:
+            message = await asyncio.wait_for(client_connection.read_message(), 
+                                            timeout=0.5)
             if not message:
                 break
-    except asyncio.CancelledError: # the QUIT command has been initiated
-        pass
-    finally:
-        client_connection.close()
+        except asyncio.TimeoutError:
+            continue
+    
+    client_connection.close()
 
-async def accept_clients(server):
-    client_connection = await server.accept_client()
-    if client_connection != None:
-        asyncio.create_task(handle_client(client_connection))
+async def accept_clients(server, shutdown_event):
+    tasked_clients = []
+    while not shutdown_event.is_set():
+        try: 
+            client_connection = await asyncio.wait_for(server.accept_client(), timeout=0.5)
+            if client_connection != None:
+                current_client_task = asyncio.create_task(handle_client(client_connection=client_connection, shutdown_event=shutdown_event))
+                tasked_clients.append(current_client_task)
+        except asyncio.TimeoutError:
+            continue
 
-     
-async def server_function(HOST, PORT):
-    server = server_lib.Server()
-    server.create_socket(HOST=HOST, PORT=PORT)
+    if tasked_clients != []:
+        for task in tasked_clients:
+            print("hi")
+            await task
+    
 
-    reader_task = asyncio.create_task(accept_clients(server=server))
-
-    print("Server has started succesfully!")
+async def command_handling(server):
     session = PromptSession()
     while True:
         with patch_stdout(): # to prevent stdout situations
@@ -43,14 +49,26 @@ async def server_function(HOST, PORT):
                     await client_1.write_data(message=server_input[4:]) # sends the message without the command
 
             elif server_input.startswith("QUIT"):
-                reader_task.cancel()
                 server.close()
                 break
 
             else:
                 print(f"Unknown command: {server_input}")
 
-        
+async def server_function(HOST, PORT):
+    server = server_lib.Server()
+    server.create_socket(HOST=HOST, PORT=PORT)
+
+    shutdown_event = asyncio.Event()
+
+    reader_task = asyncio.create_task(accept_clients(server=server, shutdown_event=shutdown_event))
+    writer_tasks = asyncio.create_task(command_handling(server=server))
+    print("Server has started succesfully!")
+
+    await writer_tasks
+    shutdown_event.set()
+    await reader_task
+    
 @click.group()
 def main_group():
     pass
