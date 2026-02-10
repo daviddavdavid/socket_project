@@ -6,27 +6,52 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout 
 
 
-async def client_messsage_reader(client):
-    try:
-        while True:
-            message = await client.read_message()
-            if message is not None:
-                print(message)
-    except asyncio.CancelledError: # the QUIT command has been initiated
-        pass 
-
-async def client_command_control(client):
-    session = PromptSession()
-    while True:
-        with patch_stdout(): # to prevent stdout situations
-            client_input = await session.prompt_async("Command: ")
-
-            if client_input.startswith("MSG ") and len(client_input) > 4:
-                await client.write_data(message=client_input[4:])
-            elif client_input.startswith("QUIT"):
+async def client_messsage_reader(client, shutdown_event):
+     while not shutdown_event.is_set():
+        try:
+            message = await asyncio.wait_for(client.read_message(), timeout=0.5)
+            if message == b"" or message is None:
+                shutdown_event.set()
                 break
             else:
-                print(f"Unknown command: {client_input}")
+                print(f"Server: {message}")
+        
+        except asyncio.TimeoutError: # the QUIT command has been initiated
+            continue 
+
+
+async def client_command_control(client, shutdown_event):
+    session = PromptSession()
+    while not shutdown_event.is_set(): # just in case
+        with patch_stdout(): 
+
+            client_input_task = asyncio.create_task(session.prompt_async("Command: "))
+            shutdown_input = asyncio.create_task(shutdown_event.wait())
+
+            done, pending = await asyncio.wait(
+                {client_input_task, shutdown_input},  return_when=asyncio.FIRST_COMPLETED
+            )
+
+            if shutdown_input in done:
+                client_input_task.cancel()
+                try:
+                    await client_input_task
+                except asyncio.CancelledError:
+                    pass
+                break
+            elif client_input_task in done:
+                try:
+                    client_input = client_input_task.result()
+                except asyncio.CancelledError: # Just in case, realistically it should not trigger
+                    break
+
+                if client_input.startswith("MSG ") and len(client_input) > 4:
+                    await client.write_data(message=client_input[4:])
+                elif client_input.startswith("QUIT"):
+                    break 
+                else:
+                    print(f"Unknown command: {client_input}")
+        
 
 @click.group()
 def main_group():
@@ -39,16 +64,14 @@ async def client_function(host, port):
     client.create_socket(HOST=host, PORT=port)
     client.connect_to_server()
 
-    reader_task = asyncio.create_task(client_messsage_reader(client=client))
-    writer_task = asyncio.create_task(client_command_control(client=client))
+    shutdown_task = asyncio.Event()
+
+    reader_task = asyncio.create_task(client_messsage_reader(client=client, shutdown_event=shutdown_task))
+    writer_task = asyncio.create_task(client_command_control(client=client, shutdown_event=shutdown_task))
 
     await writer_task
-
-    if not reader_task.done():
-        reader_task.cancel()
-
-    await reader_task # just to let asyncio do the right garbage collecitng
-
+    shutdown_task.set()
+    await reader_task 
     client.close()
 
 @click.command(name="START")

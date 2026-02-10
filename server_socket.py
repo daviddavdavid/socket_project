@@ -10,8 +10,10 @@ async def handle_client(client_connection, shutdown_event):
         try:
             message = await asyncio.wait_for(client_connection.read_message(), 
                                             timeout=0.5)
-            if not message:
-                break
+            if message is None or message == b"":
+                break # No shutdown event because we only want the client to disconnect
+            else:
+                print(f"client: {message}")
         except asyncio.TimeoutError:
             continue
     
@@ -22,7 +24,7 @@ async def accept_clients(server, shutdown_event):
     while not shutdown_event.is_set():
         try: 
             client_connection = await asyncio.wait_for(server.accept_client(), timeout=0.5)
-            if client_connection != None:
+            if client_connection is not None:
                 current_client_task = asyncio.create_task(handle_client(client_connection=client_connection, shutdown_event=shutdown_event))
                 tasked_clients.append(current_client_task)
         except asyncio.TimeoutError:
@@ -30,7 +32,6 @@ async def accept_clients(server, shutdown_event):
 
     if tasked_clients != []:
         for task in tasked_clients:
-            print("hi")
             await task
     
 
@@ -49,7 +50,7 @@ async def command_handling(server):
                     await client_1.write_data(message=server_input[4:]) # sends the message without the command
 
             elif server_input.startswith("QUIT"):
-                server.close()
+                print("Iniating server closing procedure...") # should notify clients first and then let them close so I dont get any weird errors
                 break
 
             else:
@@ -68,6 +69,7 @@ async def server_function(HOST, PORT):
     await writer_tasks
     shutdown_event.set()
     await reader_task
+    server.close()
     
 @click.group()
 def main_group():

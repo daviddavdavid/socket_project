@@ -46,7 +46,7 @@ class ClientSocket:
             raise Exception(f"SOCKET CLOSING ERROR BECAUSE OF {error!r}")
         finally:
             self.current_socket = None
-            print(f"Connection ended, client closed the socket")
+            print(f"Connection ended, socket was closed")
 
 
     async def _send_to_server(self, total_message):
